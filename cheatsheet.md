@@ -1,4 +1,57 @@
 ### 算法部分
+#### 关键路径
+边活动（Activity On Edge, AOE）网
+AOE网络中的最长路径被称为关键路径，把关键路径上的活动称为关键活动。
+有向无环图（DAG），节点代表事件或里程碑，边代表活动，并且每条边有一个权重，表示完成该活动所需的时间。
+step1:计算最早开始时间 (Earliest Start Time, EST)
+使用拓扑排序遍历图
+EST[v] = max(EST[v],EST[u] + weight(u, v))
+step2:计算最晚开始时间 (Latest Start Time, LST)
+反向遍历拓扑排序后的图
+LST[v] = min(LST[v],LST[u] - weight(v, u))
+```python
+from collections import defaultdict, deque
+class CriticalPath:
+    def __init__(self, n):
+        self.n = n  # 节点数
+        self.graph = defaultdict(list)
+        self.in_degree = [0] * n
+    def add_edge(self, u, v, w):
+        self.graph[u].append((v, w))
+        self.in_degree[v] += 1
+    def critical_path(self):
+        # 拓扑排序
+        queue = deque()
+        for i in range(self.n):
+            if self.in_degree[i] == 0:
+                queue.append(i)
+        topo_order = []
+        ve = [0] * self.n  # 最早发生时间
+        while queue:
+            u = queue.popleft()
+            topo_order.append(u)
+            for v, w in self.graph[u]:
+                if ve[u] + w > ve[v]:
+                    ve[v] = ve[u] + w
+                self.in_degree[v] -= 1
+                if self.in_degree[v] == 0:
+                    queue.append(v)
+        # 逆向计算最晚发生时间
+        vl = [ve[topo_order[-1]]] * self.n
+        for u in reversed(topo_order):
+            for v, w in self.graph[u]:
+                if vl[v] - w < vl[u]:
+                    vl[u] = vl[v] - w
+        # 找关键活动
+        critical_edges = []
+        for u in range(self.n):
+            for v, w in self.graph[u]:
+                e = ve[u]
+                l = vl[v] - w
+                if e == l:
+                    critical_edges.append((u, v, w))
+        return ve, vl, critical_edges
+```
 #### 最小生成树（MST:Minimum Spanning Tree）算法
 对于一个连通的加权无向图，最小生成树是该图的一个子图，它包含图中所有的顶点，并且是一棵边权值之和最小的树（即任意两个顶点之间有且只有一条路径，且边数为 $V-1$）。
 * Prim算法：用于找到连接所有顶点的最小生成树。
@@ -815,7 +868,50 @@ def __lt__(self, other):
         return self.char < other.char
     return self.weight < other.weight
 ```
+OOP
+```python
+def __add__(self,Fraction1):
+    qitafenzi = Fraction1.fenzi
+    qitafenmu = Fraction1.fenmu
+    newfenmu = qitafenmu*self.fenmu
+    newfenzi = (qitafenzi*self.fenmu)+(self.fenzi*qitafenmu)
+    return Fraction(newfenzi,newfenmu).huajian()
+f1 = Fraction(a,b)
+f2 = Fraction(c,d)
+f = f1+f2
+```
 
 从myset中拿第一个元素：`myset.pop()`
 
 `nonlocal` 关键字的作用是：在嵌套函数（函数内部的函数）中，声明一个变量不是局部变量，而是属于“外层但非全局”作用域的变量。
+
+```python
+int("10",2) #2
+```
+
+浅拷贝（Shallow Copy）：`.copy()`
+浅拷贝会创建一个新对象，但如果对象内部包含子对象（如列表中的列表），新对象只会引用原有的子对象。
+特点：只拷贝最外层。
+副作用：修改新对象中的子对象，原对象也会跟着变。
+```Python
+import copy
+original = [[1, 2], 3]
+shallow = original.copy()  # 或者 list(original)
+shallow[0][0] = 'X'  # 修改嵌套的子列表
+shallow[1] = 'Y'     # 修改最外层元素
+print(f"原对象: {original}")  # 输出: [['X', 2], 3] -> 子对象变了！
+print(f"浅拷贝: {shallow}")   # 输出: [['X', 2], 'Y']
+```
+
+深拷贝（Deep Copy）：`copy.deepcopy()`
+深拷贝会递归地拷贝对象及其内部的所有子对象。新对象与原对象在内存中完全独立。
+特点：完全递归拷贝，彻底隔离。
+副作用：比浅拷贝慢，且消耗更多内存（因为它创建了大量的重复对象）。
+```python
+import copy
+original = [[1, 2], 3]
+deep = copy.deepcopy(original)
+deep[0][0] = 'X'
+print(f"原对象: {original}")  # 输出: [[1, 2], 3] -> 不受影响
+print(f"深拷贝: {deep}")      # 输出: [['X', 2], 3]
+```
