@@ -547,6 +547,8 @@ def query(l, r, n): #[l, r)
 ```
 #### 树状数组（BIT/Fenwick Tree）
 单点修改和前缀和查询
+动态前缀和、逆序对计数、区间更新+单点查询（配合差分）
+![alt text](截屏2026-03-11%2014.47.55.png)
 ```python
 # Binary Indexed Tree
 class BIT:
@@ -914,4 +916,33 @@ deep = copy.deepcopy(original)
 deep[0][0] = 'X'
 print(f"原对象: {original}")  # 输出: [[1, 2], 3] -> 不受影响
 print(f"深拷贝: {deep}")      # 输出: [['X', 2], 3]
+```
+
+位运算
+- 检查i是否为2的幂
+`if i & (i - 1) == 0:`
+- 提取一个整数在二进制表示下，最低位的那个 1 所代表的数值。
+$lowbit(x) = x \ \& \ (-x)$
+
+bytearray
+```python
+# 1. 创建一个bytearray笔记本，写进去"hello"
+notebook = bytearray(b"hello")
+print("初始内容：", notebook)  # 输出：bytearray(b'hello')
+# 2. 直接改第2个字符（把l改成L）
+notebook[2] = 76  # 76是L的数字密码
+print("改完后：", notebook)    # 输出：bytearray(b'heLlo')
+# 3. 再追加一个！
+notebook.append(33)  # 33是!的数字密码
+print("追加后：", notebook)    # 输出：bytearray(b'heLlo!')
+```
+
+accumulate的用法
+```python
+from itertools import accumulate
+nums = [1,2,3,4,5]
+list(accumulate(nums)) # [1,3,6,10,15]
+list(accumulate(nums,operator.mul)) # [1,2,6,24,120]
+nums = [3,1,5,2,4]
+list(accumulate(nums, max)) # [3,3,5,5,5]
 ```
