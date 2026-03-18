@@ -1,4 +1,68 @@
 ### 算法部分
+#### KMP（Knuth-Morris-Pratt）
+重点关注如何更新LPS（Longest Proper Prefix which is also Suffix）
+- 当你有一个很长的文本串 $S$（主串），和一个较短的模式串 $P$，你想知道 $P$ 是否在 $S$ 中出现过，以及出现的位置在哪里。
+```python
+""""
+compute_lps 函数用于计算模式字符串的LPS表。LPS表是一个数组，
+其中的每个元素表示模式字符串中当前位置之前的子串的最长前缀后缀的长度。
+该函数使用了两个指针 length 和 i，从模式字符串的第二个字符开始遍历。
+"""
+def compute_lps(pattern):
+    """
+    计算pattern字符串的最长前缀后缀（Longest Proper Prefix which is also Suffix）表
+    :param pattern: 模式字符串
+    :return: lps表
+    """
+    m = len(pattern)
+    lps = [0] * m  # 初始化lps数组
+    length = 0  # 当前最长前后缀长度
+    for i in range(1, m):  # 注意i从1开始，lps[0]永远是0
+        while length > 0 and pattern[i] != pattern[length]:
+            length = lps[length - 1]  # 回退到上一个有效前后缀长度
+        if pattern[i] == pattern[length]:
+            length += 1
+        lps[i] = length
+    return lps
+def kmp_search(text, pattern):
+    n = len(text)
+    m = len(pattern)
+    if m == 0:
+        return 0
+    lps = compute_lps(pattern)
+    matches = []
+    # 在 text 中查找 pattern
+    j = 0  # 模式串指针
+    for i in range(n):  # 主串指针
+        while j > 0 and text[i] != pattern[j]:
+            j = lps[j - 1]  # 模式串回退
+        if text[i] == pattern[j]:
+            j += 1
+        if j == m:
+            matches.append(i - j + 1)  # 匹配成功
+            j = lps[j - 1]  # 查找下一个匹配
+
+    return matches
+```
+- 找最小循环元：假设一个字符串的长度为 L（1-based 计数），其对应的 LPS 数组最后一位为 lps[L-1]。 若满足 
+`L(mod(L−lps[L−1]))==0`，则：
+该字符串由一个长度为 `d = L - lps[L-1]` 的子串重复构成。
+该子串即为最小循环元，重复次数 K = L / d。
+```python
+def is_repeated_pattern(s: str) -> bool:
+    n = len(s)
+    next = [0] * (n + 1)
+    j = 0
+    for i in range(2, n + 1):
+        while j > 0 and s[j] != s[i-1]:
+            j = next[j]
+        if s[j] == s[i - 1]:
+            j += 1
+        next[i] = j
+
+    p = n - next[n]
+    return n % p == 0 and n != p
+```
 #### 关键路径
 边活动（Activity On Edge, AOE）网
 AOE网络中的最长路径被称为关键路径，把关键路径上的活动称为关键活动。
@@ -946,3 +1010,13 @@ list(accumulate(nums,operator.mul)) # [1,2,6,24,120]
 nums = [3,1,5,2,4]
 list(accumulate(nums, max)) # [3,3,5,5,5]
 ```
+
+常用集合操作对照表
+
+| 术语       | 集合符号        | 位运算 (C++/Python) | 集合示例                                 | 位运算示例 ($1101$ 与 $0111$)  |
+| :--------- | :-------------- | :------------------ | :--------------------------------------- | :----------------------------- |
+| **交集**   | $A \cap B$      | `a & b`             | $\{0,2,3\} \cap \{0,1,2\} = \{0,2\}$     | `1101 & 0111 = 0101`           |
+| **并集**   | $A \cup B$      | `a | b`             | $\{0,2,3\} \cup \{0,1,2\} = \{0,1,2,3\}$ | `1101 | 0111 = 1111`           |
+| **差集**   | $A \setminus B$ | `a & (~b)`          | $\{0,2,3\} \setminus \{0,1,2\} = \{3\}$  | `1101 & (~0111) = 1000`        |
+| **对称差** | $A \Delta B$    | `a ^ b`             | 仅属于 A 或 B 的元素                     | `1101 ^ 0111 = 1010`           |
+| **包含于** | $A \subseteq B$ | `(a & b) == a`      | 检查 A 是否为 B 的子集                   | `(0101 & 0111) == 0101` (True) |
