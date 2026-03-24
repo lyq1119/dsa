@@ -1,4 +1,72 @@
 ### 算法部分
+#### 快速排序(双指针法)
+```python
+def quick_sort(arr, low, high):
+    """
+    快速排序主函数（递归入口）
+    arr: 待排序的列表，low: 当前处理子数组的起始索引，high: 当前处理子数组的结束索引
+    """
+    # 递归终止条件：当子数组长度为 0 或 1 时（low >= high），无需排序
+    if low < high:
+        # 1. 分区操作：将数组分为两部分，左边 <= pivot，右边 >= pivot
+        # 返回 pivot 最终所在的索引位置
+        pivot_idx = partition(arr, low, high)
+        
+        # 2. 递归排序 pivot 左边的子数组
+        quick_sort(arr, low, pivot_idx - 1)
+        
+        # 3. 递归排序 pivot 右边的子数组
+        quick_sort(arr, pivot_idx + 1, high)
+
+def partition(arr, low, high):
+    """
+    分区函数（双指针法 / 双向扫描）。逻辑：
+    1. 选取第一个元素作为基准值 (pivot)。
+    2. left 指针从左向右找大于 pivot 的数。
+    3. right 指针从右向左找小于 pivot 的数。
+    4. 交换这两个数，直到指针相遇。
+    5. 最后将 pivot 放到相遇位置（right），完成分区。
+    
+    返回: right: pivot 最终所在的索引
+    """
+    # 选取子数组的第一个元素作为基准值
+    pivot = arr[low]
+    
+    # 初始化双指针
+    # left 从基准值的下一个位置开始，向右扫描
+    left = low + 1
+    # right 从子数组末尾开始，向左扫描
+    right = high
+    
+    while True:
+         # 只要 left 没越界 且 当前元素 <= pivot，就继续向右移
+        # 目的：找到第一个 > pivot 的元素
+        while left <= right and arr[left] <= pivot:
+            left += 1
+            
+        # 只要 right 没越界 且 当前元素 >= pivot，就继续向左移
+        # 目的：找到第一个 < pivot 的元素
+        while left <= right and arr[right] >= pivot:
+            right -= 1
+            
+        # --- 判断是否交换 ---
+        if left <= right:
+            # 如果 left 和 right 没有交错，说明找到了逆序对
+            # 交换 arr[left] (大于pivot) 和 arr[right] (小于pivot)
+            arr[left], arr[right] = arr[right], arr[left]
+        else:
+            # 如果 left > right，说明指针已交错，扫描结束
+            break
+            
+    # --- 基准值归位 ---
+    # 循环结束后，right 指向的是最后一个 <= pivot 的位置
+    # 将基准值 (arr[low]) 与 arr[right] 交换
+    # 此时，right 左侧都 <= pivot，右侧都 >= pivot
+    arr[low], arr[right] = arr[right], arr[low]
+    
+    # 返回基准值的最终索引，供递归使用
+    return right
+```
 #### KMP（Knuth-Morris-Pratt）
 重点关注如何更新LPS（Longest Proper Prefix which is also Suffix）
 - 当你有一个很长的文本串 $S$（主串），和一个较短的模式串 $P$，你想知道 $P$ 是否在 $S$ 中出现过，以及出现的位置在哪里。
