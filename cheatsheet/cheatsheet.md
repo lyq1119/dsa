@@ -70,6 +70,8 @@ def partition(arr, low, high):
 #### KMP（Knuth-Morris-Pratt）
 重点关注如何更新LPS（Longest Proper Prefix which is also Suffix）
 - 当你有一个很长的文本串 $S$（主串），和一个较短的模式串 $P$，你想知道 $P$ 是否在 $S$ 中出现过，以及出现的位置在哪里。
+对字符串 pattern 的某个位置 i：
+lps[i] = 从开头到 i 位置的子串中，最长的那个既是前缀、又是后缀，且不包含整个字符串的长度。
 ```python
 """"
 compute_lps 函数用于计算模式字符串的LPS表。LPS表是一个数组，
@@ -116,6 +118,7 @@ def kmp_search(text, pattern):
 `L(mod(L−lps[L−1]))==0`，则：
 该字符串由一个长度为 `d = L - lps[L-1]` 的子串重复构成。
 该子串即为最小循环元，重复次数 K = L / d。
+`next[i]` = 前 i 个字符中，最长相等前缀与后缀的长度
 ```python
 def is_repeated_pattern(s: str) -> bool:
     n = len(s)
@@ -595,6 +598,75 @@ for word in all_words:
         bucket = f"{word[:i]}_{word[i + 1:]}"
         buckets.setdefault(bucket, set()).add(word)
 ```
+#### AVL树
+AVL树一共四种情况
+```python
+import sys
+class TreeNode:
+    def __init__(self,val):
+        self.val = val
+        self.height = 1
+        self.left = None
+        self.right = None
+def solve():
+    data = sys.stdin.read().split()
+    n = int(data[0])
+    tree = None
+    def get_height(node):
+        if not node:
+            return 0
+        return node.height
+    def rightrotate(node):
+        root = node.left
+        node1 = node.left.right
+        root.right = node
+        node.left = node1
+        node.height = max(get_height(node.left),get_height(node.right))+1
+        root.height = max(get_height(root.left),get_height(root.right))+1
+        return root
+    def leftrotate(node):
+        root = node.right
+        node1 = node.right.left
+        root.left = node
+        node.right = node1
+        node.height = max(get_height(node.left),get_height(node.right))+1
+        root.height = max(get_height(root.left),get_height(root.right))+1
+        return root
+    def insert(node,val):
+        if not node:
+            return TreeNode(val)
+        if val < node.val:
+            node.left = insert(node.left,val)
+        else:
+            node.right = insert(node.right,val)
+        node.height = max(get_height(node.left),get_height(node.right))+1
+        balance = get_height(node.left)-get_height(node.right)
+        if balance > 1:
+            if val < node.left.val:
+                node = rightrotate(node)
+            else:
+                node.left = leftrotate(node.left)
+                node = rightrotate(node)
+        elif balance < -1:
+            if val > node.right.val:
+                node = leftrotate(node)
+            else:
+                node.right = rightrotate(node.right)
+                node = leftrotate(node)
+        return node
+    for i in range(1,n+1):
+        tree = insert(tree,int(data[i]))
+    result = []
+    def preorder(node):
+        if node:
+            result.append(node.val)
+            preorder(node.left)
+            preorder(node.right)
+    preorder(tree)
+    print(*result)
+if __name__ == "__main__":
+    solve()
+```
 #### 前缀树（Trie）
 ```python
 class Trie:
@@ -642,11 +714,12 @@ trie.insert("b") # {'a': {'p': {'p': {'l': {'e': {None: {}}}, None: {}}}}, 'b': 
 #### 线段树（segment tree）
 处理任何区间类问题
 将一个大区间 $O(n)$ 的查询，拆解成若干个已经预处理好的小区间 $O(\log n)$ 的拼接。
-对[1,2,3]建树
-6
-1 5
-1 2 3
+对[1,2,3，4]建树
+[1,4],
+[1,2],[3,4]
+[1,1],[2,2],[3,3],[4,4]
 ```python
+#先将序列长度扩为2的幂次再进行操作，也就是让n为2的幂
 tree = [0] * (2*n)
 def build(arr, n):
     for i in range(n):
@@ -672,7 +745,7 @@ def query(l, r, n): #[l, r)
             l += 1
         if (r % 2 != 0):
             r -= 1
-            res += tree[r]
+            res += tree[r] #这里的r是已经被减过了的
         l = l // 2
         r = r // 2
     return res
@@ -750,7 +823,7 @@ def constructtree(ceng,k):#层序，第ceng层的第k个，根在第0层
     if ceng > cengshu:
         return
     m = (1 << ceng)+k-2
-    if not mylist[m]:
+    if mylist[m] != 0 and not mylist[m]:
         return
     node = TreeNode(mylist[m])
     node.left = constructtree(ceng+1,2*k-1)

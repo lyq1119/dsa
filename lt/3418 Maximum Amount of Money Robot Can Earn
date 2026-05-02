@@ -1,0 +1,30 @@
+class Solution:
+    def maximumAmount(self, coins) -> int:
+        m,n = len(coins),len(coins[0])
+        from collections import deque
+        if coins[0][0] >= 0:
+            queue = deque([(0,0,0)])
+            visited = [[[-float("inf") for _ in range(n)] for __ in range(m)],[[-float("inf") for _ in range(n)] for __ in range(m)],[[-float("inf") for _ in range(n)] for __ in range(m)]]
+            visited[0][0][0] = coins[0][0]
+        else:
+            queue = deque([(0,0,0),(0,0,1)])
+            visited = [[[-float("inf") for _ in range(n)] for __ in range(m)],[[-float("inf") for _ in range(n)] for __ in range(m)],[[-float("inf") for _ in range(n)] for __ in range(m)]]
+            visited[0][0][0] = coins[0][0]
+            visited[1][0][0] = 0
+        vectors = [(0,1),(1,0)]
+        while queue:
+            i,j,magic = queue.popleft()
+            for a,b in vectors:
+                profit = visited[magic][i][j]
+                if i+a <= m-1 and j+b <= n-1:
+                    if coins[i+a][j+b] >= 0 and profit+coins[i+a][j+b] > visited[magic][i+a][j+b]:
+                        queue.append((i+a,j+b,magic))
+                        visited[magic][i+a][j+b] = profit+coins[i+a][j+b]
+                    elif coins[i+a][j+b] < 0:
+                        if profit+coins[i+a][j+b] > visited[magic][i+a][j+b]:
+                            queue.append((i+a,j+b,magic))
+                            visited[magic][i+a][j+b] = profit+coins[i+a][j+b]
+                        if magic <= 1 and profit > visited[magic+1][i+a][j+b]:
+                            queue.append((i+a,j+b,magic+1))
+                            visited[magic+1][i+a][j+b] = profit
+        return max([visited[i][m-1][n-1] for i in range(3)])
