@@ -1,0 +1,43 @@
+from collections import deque
+n,m = map(int,input().split())
+graph = [[] for _ in range(n)]
+for _ in range(m):
+    i,j = map(int,input().split())
+    i -= 1
+    j -= 1
+    graph[i].append(j)
+dp = [0 for _ in range(n)]
+def karn(graph,n): # n是顶点数
+    indegree = [0] * n
+    result = []
+    queue = deque()
+    # 计算每个顶点的入度
+    myset = set()
+    for u in range(n):
+        for v in graph[u]:
+            indegree[v] += 1
+    # 将入度为 0 的顶点加入队列
+    for u in range(n):
+        if indegree[u] == 0:
+            myset.add(u)
+            queue.append(u)
+    # 执行拓扑排序
+    while queue:
+        u = queue.popleft()
+        result.append(u)
+        for v in graph[u]:
+            indegree[v] -= 1
+            if indegree[v] == 0:
+                queue.append(v)
+    result.reverse()
+    for num in result:
+        for t in graph[num]:
+            dp[num] += dp[t]
+            dp[num] %= 80112002
+        dp[num] = max(dp[num],1)
+    total = 0
+    for i in myset:
+        total += dp[i]
+        total %= 80112002
+    print(total)
+karn(graph,n)

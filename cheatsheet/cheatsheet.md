@@ -1,4 +1,74 @@
 ### 算法部分
+runtime error：还没读取完就return了；递归深度爆了
+#### kd树
+找二维平面的离原点最近的k近邻
+```python
+import heapq
+
+class KdNode:
+    def __init__(self, point, split, left=None, right=None):
+        self.point = point
+        self.split = split
+        self.left = left
+        self.right = right
+
+class Solution:
+    def kClosest(self, points: List[List[int]], k: int) -> List[List[int]]:
+        # 1. 构建 KD 树
+        def build_tree(data, depth):
+            if not data:
+                return None
+            axis = depth % 2 # 2维空间，只有 0 和 1
+            data.sort(key=lambda x: x[axis])
+            mid = len(data) // 2
+            return KdNode(
+                point=data[mid],
+                split=axis,
+                left=build_tree(data[:mid], depth + 1),
+                right=build_tree(data[mid+1:], depth + 1)
+            )
+        
+        root = build_tree(points, 0)
+        
+        # 2. 搜索 K 个最近邻
+        # heap 中存储的是 (-距离, 点)，因为 Python 的 heapq 是小顶堆，
+        # 用负数可以模拟大顶堆，方便弹出距离最远的点
+        self.max_heap = []
+        
+        def get_dist(p):
+            return p[0]**2 + p[1]**2 # 省略开方以优化性能
+            
+        def search(node):
+            if not node:
+                return
+            
+            dist = get_dist(node.point)
+            axis = node.split
+            
+            # 维护大小为 k 的大顶堆
+            if len(self.max_heap) < k:
+                heapq.heappush(self.max_heap, (-dist, node.point))
+            elif dist < -self.max_heap[0][0]:
+                heapq.heapreplace(self.max_heap, (-dist, node.point))
+            
+            # 决定搜索方向
+            target_val = 0 # 因为是离原点(0,0)的距离，目标点值永远是0
+            if target_val < node.point[axis]:
+                near, far = node.left, node.right
+            else:
+                near, far = node.right, node.left
+            
+            search(near)
+            
+            # 剪枝：如果另一侧还可能存在更近的点，则进入另一侧
+            # 这里的“墙”是 node.point[axis]，目标点在 0
+            # 距离墙的平方距离是 (node.point[axis] - 0)^2
+            if len(self.max_heap) < k or (node.point[axis]**2 < -self.max_heap[0][0]):
+                search(far)
+                
+        search(root)
+        return [p for d, p in self.max_heap]
+```
 #### 快速排序(双指针法)
 ```python
 def quick_sort(arr, low, high):
@@ -398,8 +468,11 @@ print("Topological sort order:", sorted_vertices)
 # Output:
 # Topological sort order: ['A', 'B', 'C', 'D', 'E', 'F']
 ```
-#### 强连通分量算法
+#### 强连通分量算法（SCC）
 强连通分量（SCC：Strongly Connected Components）是指有向图中的一个极大子图，其中任意两个节点都是相互可达的。
+SCC好处在于可以缩点然后变成有向无环图（DAG）进行拓扑排序
+凡是研究各个点能到哪些点的题一定要想到SCC
+注意特判：比如只有一个强连通块，比如只有一块入度为0，比如只有一块出度为0
 * Kosaraju算法 / 2 DFS：用于找到有向图中的所有强连通分量。
 第一次DFS：在第一次DFS中，我们对图进行标准的深度优先搜索，但是在此过程中，我们记录下顶点完成搜索的顺序。这一步的目的是为了找出每个顶点的完成时间（即结束时间）。(这个结束时间就是它遍历完所有顶点之后)
 反向图：接下来，我们对原图取反，即将所有的边方向反转，得到反向图。
@@ -486,6 +559,65 @@ def tarjan_scc(n, adj):
 # n, m = 3, 3
 # adj = [[1], [2], [0]] # 一个简单的环 0->1->2->0
 # print(tarjan_scc(n, adj)) # 输出: [[2, 1, 0]]
+```
+两种方法之后缩点变成dag，下面给出2dfs的代码
+```python
+def kosaraju(n, adj):
+    # 1. 正向 DFS，记录完成顺序
+    visited = [False] * n
+    stack = []
+    def dfs1(u):
+        visited[u] = True
+        for v in adj[u]:
+            if not visited[v]:
+                dfs1(v)
+        stack.append(u)  # 回溯时压入栈
+    for i in range(n):
+        if not visited[i]:
+            dfs1(i)
+    # 2. 创建反向图
+    rev_adj = [[] for _ in range(n)]
+    for u in range(n):
+        for v in adj[u]:
+            rev_adj[v].append(u)
+    # 3. 反向 DFS，提取 SCC
+    visited = [False] * n
+    sccs = []
+    def dfs2(u, current_scc):
+        visited[u] = True
+        current_scc.append(u)
+        for v in rev_adj[u]:
+            if not visited[v]:
+                dfs2(v, current_scc)
+    while stack:
+        u = stack.pop()
+        if not visited[u]:
+            current_scc = []
+            dfs2(u, current_scc)
+            sccs.append(current_scc)
+    # 给每个点分配SCC编号
+    scc_id = [0] * n
+    for i in range(len(sccs)):
+        for node in sccs[i]:
+            scc_id[node] = i
+    # 构建缩点后的 DAG & 计算出度
+    dag = [[] for _ in range(len(sccs))]
+    out_degree = [0] * len(sccs)
+    edges = set()  # 防止重复建边
+    for u in range(n):
+        for v in adj[u]:
+            a = scc_id[u]
+            b = scc_id[v]
+            if a != b and (a, b) not in edges:
+                edges.add((a, b))
+                dag[a].append(b)
+                out_degree[a] += 1
+    # 返回：
+    # sccs：所有强连通分量
+    # scc_id：每个点属于哪个scc
+    # dag：缩点后的有向无环图
+    # out_degree：每个缩点的出度
+    return sccs, scc_id, dag, out_degree
 ```
 #### 最短路径算法                 
 Dijkstra算法：带非负权边的图中，用于找到两个顶点之间的最短路径。（这里距离路径都是算上权重的）
@@ -944,6 +1076,86 @@ def union(i, j):
         Parent[j1] = i1
         Size[i1] += Size[j1]
 ```
+经典题目：食物链
+```
+总Time Limit: 1000ms Memory Limit: 65536kB
+Description
+动物王国中有三类动物A,B,C，这三类动物的食物链构成了有趣的环形。A吃B， B吃C，C吃A。
+现有N个动物，以1－N编号。每个动物都是A,B,C中的一种，但是我们并不知道它到底是哪一种。
+有人用两种说法对这N个动物所构成的食物链关系进行描述：
+第一种说法是"1 X Y"，表示X和Y是同类。
+第二种说法是"2 X Y"，表示X吃Y。
+此人对N个动物，用上述两种说法，一句接一句地说出K句话，这K句话有的是真的，有的是假的。当一句话满足下列三条之一时，这句话就是假话，否则就是真话。
+1） 当前的话与前面的某些真的话冲突，就是假话；
+2） 当前的话中X或Y比N大，就是假话；
+3） 当前的话表示X吃X，就是假话。
+你的任务是根据给定的N（1 <= N <= 50,000）和K句话（0 <= K <= 100,000），输出假话的总数。
+Input
+第一行是两个整数N和K，以一个空格分隔。
+以下K行每行是三个正整数 D，X，Y，两数之间用一个空格隔开，其中D表示说法的种类。
+若D=1，则表示X和Y是同类。
+若D=2，则表示X吃Y。
+Output
+只有一个整数，表示假话的数目。
+Sample Input
+100 7
+1 101 1 
+2 1 2
+2 2 3 
+2 3 3 
+1 1 3 
+2 3 1 
+1 5 5
+Sample Output
+3
+```
+type[x] % 3 ==
+0 ：x 和 x的根结点 同类
+1 ：x 吃 x的根结点
+2 ：x的根结点 吃 x
+i → i1（i的根）：type[i] = (i与i1是否同类的数)
+```python
+N,K = map(int,input().split())
+Parent = [i for i in range(N)]
+type = [0]*N
+count = 0
+def find(i):
+    if (Parent[i] == i):
+        return i
+    else:
+        result = find(Parent[i])
+        type[i] = (type[i]+type[Parent[i]])%3 #这里是找以前的父节点，后面率先更新的type应该是以前的父节点
+        Parent[i] = result
+        return result
+for _ in range(K):
+    D,i,j = map(int,input().split())
+    if i >= N+1 or i <= 0 or j >= N+1 or j <= 0:
+        count += 1
+        continue
+    i -= 1
+    j -= 1
+    if D == 1:
+        i1 = find(i)
+        j1 = find(j)
+        if i1 == j1:
+            if (type[i] - type[j]) % 3 != 0:
+                count += 1
+                continue
+        else:
+            Parent[j1] = i1
+            type[j1] = (type[i]-type[j])%3
+    if D == 2:
+        i1 = find(i)
+        j1 = find(j)
+        if i1 == j1:
+            if (type[i]-type[j]-1)%3 != 0:
+                count += 1
+                continue
+        else:
+            Parent[i1] = j1
+            type[i1] = (type[j]-type[i]+1)%3
+print(count)
+```
 #### 栈（Stack）
 中缀转后缀算法
 数字  扔进输出。
@@ -1031,25 +1243,26 @@ def show(head):
         head = head.next
     return result
 ```
+#### 位运算
+按位与 AND（&）（两个位都为 1 → 结果为 1，否则为 0）
+按位或 OR（|）（只要有一个位为 1 → 结果为 1，两个都是 0 才为 0）    
+按位异或 XOR（^）（两位相同 → 0，不同 → 1）
+按位取反 NOT（~）
+~n 在二进制表示是把n的0改成1，1改成0  
+-n = ~n + 1
+```
+n：是一个整数，比如 n = 12，二进制是 1100
+-n：在计算机中用补码表示，就是 ~n + 1
+n = 00001100
+~n = 11110011
+-n = 11110100 （相当于取反+1）
+```
+- 检查i是否为2的幂
+`if i & (i - 1) == 0:`
+- 提取一个整数在二进制表示下，最低位的那个 1 所代表的数值。
+$lowbit(x) = x \ \& \ (-x)$
 ### 语法部分
-Python字符串提供的方法
-
-| **Method Name** | **Use**                | **Explanation**                                           |
-| :-------------- | :--------------------- | :-------------------------------------------------------- |
-| `center`        | `astring.center(w)`    | Returns a string centered in a field of size `w`          |
-| `ljust`         | `astring.ljust(w)`     | Returns a string left-justified in a field of size `w`    |
-| `rjust`         | `astring.rjust(w)`     | Returns a string right-justified in a field of size `w`   |
-| `find`          | `astring.find(item)`   | Returns the index of the first occurrence of `item`       |
-
-| **Operation Name** | **Operator**       | **Explanation**                                              |
-| :----------------- | :----------------- | :----------------------------------------------------------- |
-| `\|`                | `aset \| otherset`  | Returns a new set with all elements from both sets           |
-| `&`                | `aset & otherset`  | Returns a new set with only those elements common to both sets |
-| `-`                | `aset - otherset`  | Returns a new set with all items from the first set not in second |
-| `<=`               | `aset <= otherset` | Asks whether all elements of the first set are in the second |
-| `union`         | `aset.union(otherset)`        | Returns a new set with all elements from both sets           |
-
-random模块
+#### random模块
 
 | 函数                  | 功能      | 返回类型    | 取值范围 / 特点    | 常见用途    |
 | ------------------- | ------- | ------- | ------------ | ------- |
@@ -1062,20 +1275,13 @@ random模块
 | `shuffle(seq)`      | 原地打乱    | `None`  | 修改原列表        | 洗牌      |
 | `uniform(a, b)`     | 随机浮点数   | `float` | `[a, b)`     | 连续分布    |
 
-运算符计算
+#### 运算符计算
 ```python
 opers = {'+':operator.add, '-':operator.sub, '*':operator.mul, '/':operator.truediv}
 opers[运算符](a,b)
 ```
 
-对类用heap的话，要利用__lt__定义大小比较关系
-```python
-def __lt__(self, other):
-    if self.weight == other.weight:
-        return self.char < other.char
-    return self.weight < other.weight
-```
-OOP
+#### OOP
 ```python
 def __add__(self,Fraction1):
     qitafenzi = Fraction1.fenzi
@@ -1087,15 +1293,25 @@ f1 = Fraction(a,b)
 f2 = Fraction(c,d)
 f = f1+f2
 ```
+对类用heap的话，要利用__lt__定义大小比较关系
+```python
+def __lt__(self, other):
+    if self.weight == other.weight:
+        return self.char < other.char
+    return self.weight < other.weight
+```
 
-从myset中拿第一个元素：`myset.pop()`
+#### 从myset中拿第一个元素
+`myset.pop()`
 
+#### nonlocal
 `nonlocal` 关键字的作用是：在嵌套函数（函数内部的函数）中，声明一个变量不是局部变量，而是属于“外层但非全局”作用域的变量。
 
+#### 二进制转十进制
 ```python
 int("10",2) #2
 ```
-
+#### 深拷贝浅拷贝
 浅拷贝（Shallow Copy）：`.copy()`
 浅拷贝会创建一个新对象，但如果对象内部包含子对象（如列表中的列表），新对象只会引用原有的子对象。
 特点：只拷贝最外层。
@@ -1109,7 +1325,6 @@ shallow[1] = 'Y'     # 修改最外层元素
 print(f"原对象: {original}")  # 输出: [['X', 2], 3] -> 子对象变了！
 print(f"浅拷贝: {shallow}")   # 输出: [['X', 2], 'Y']
 ```
-
 深拷贝（Deep Copy）：`copy.deepcopy()`
 深拷贝会递归地拷贝对象及其内部的所有子对象。新对象与原对象在内存中完全独立。
 特点：完全递归拷贝，彻底隔离。
@@ -1123,26 +1338,7 @@ print(f"原对象: {original}")  # 输出: [[1, 2], 3] -> 不受影响
 print(f"深拷贝: {deep}")      # 输出: [['X', 2], 3]
 ```
 
-位运算
-- 检查i是否为2的幂
-`if i & (i - 1) == 0:`
-- 提取一个整数在二进制表示下，最低位的那个 1 所代表的数值。
-$lowbit(x) = x \ \& \ (-x)$
-
-bytearray
-```python
-# 1. 创建一个bytearray笔记本，写进去"hello"
-notebook = bytearray(b"hello")
-print("初始内容：", notebook)  # 输出：bytearray(b'hello')
-# 2. 直接改第2个字符（把l改成L）
-notebook[2] = 76  # 76是L的数字密码
-print("改完后：", notebook)    # 输出：bytearray(b'heLlo')
-# 3. 再追加一个！
-notebook.append(33)  # 33是!的数字密码
-print("追加后：", notebook)    # 输出：bytearray(b'heLlo!')
-```
-
-accumulate的用法
+#### accumulate
 ```python
 from itertools import accumulate
 nums = [1,2,3,4,5]
@@ -1152,7 +1348,7 @@ nums = [3,1,5,2,4]
 list(accumulate(nums, max)) # [3,3,5,5,5]
 ```
 
-常用集合操作对照表
+#### 常用集合操作对照表
 
 | 术语       | 集合符号        | 位运算 (C++/Python) | 集合示例                                 | 位运算示例 ($1101$ 与 $0111$)  |
 | :--------- | :-------------- | :------------------ | :--------------------------------------- | :----------------------------- |
@@ -1162,8 +1358,8 @@ list(accumulate(nums, max)) # [3,3,5,5,5]
 | **对称差** | $A \Delta B$    | `a ^ b`             | 仅属于 A 或 B 的元素                     | `1101 ^ 0111 = 1010`           |
 | **包含于** | $A \subseteq B$ | `(a & b) == a`      | 检查 A 是否为 B 的子集                   | `(0101 & 0111) == 0101` (True) |
 
- - 格式说明符详解（适用于 f-string 和 .format()）  
-对齐方式与宽度
+#### 格式说明符详解
+- 对齐方式与宽度
 
 | 说明符 | 含义         | 示例           | 输出    |
 |--------|--------------|----------------|---------|
@@ -1173,7 +1369,7 @@ list(accumulate(nums, max)) # [3,3,5,5,5]
 | 数字   | 总宽度（字符数）| `f"{123:6}"`  | `'   123'` |
 | `=`    | 填充符后数字前 | `f"{42:=+5}"`  | `'+  42'` |
 
-数字格式化        
+- 数字格式化        
 
 | 类型  | 含义                  | 示例            | 输出           |
 |-------|-----------------------|-----------------|----------------|
@@ -1186,7 +1382,7 @@ list(accumulate(nums, max)) # [3,3,5,5,5]
 | E     | 科学计数法（大写 E）  | `f"{12345:E}"`  | 1.234500E+04   |
 | g     | 自动切换普通/科学计数法| `f"{12345:g}"`  | 12345          |
 
-千分位分隔符
+- 千分位分隔符
 ```python
 print(f"{1234567:,}")       # 输出: 1,234,567
 print(f"{1234567.89:,.2f}") # 输出: 1,234,567.89
@@ -1227,3 +1423,253 @@ print(f"{x:>10.2f}")  # 宽度10，右对齐，保留两位小数
 | x    | 十六进制（小写）| `f"{255:x}"`   | ff    |
 | X    | 十六进制（大写）| `f"{255:X}"`   | FF    |
 | #    | 显示前缀       | `f"{255:#x}"`  | 0xff  |
+
+#### 查找dict的第k个key
+可以用 itertools.islice 按需取（更省内存）
+```python
+from itertools import islice
+d = {"a": 1, "b": 2, "c": 3}
+k = 1
+key = next(islice(d.keys(), k, k+1))
+print(key) # b
+```
+
+#### 字符串大小写互换
+用string.swapcase()来实现
+#### 想使用改变的set，但又不想真正改变原set  
+用集合差集运算  
+```
+- 运算符（推荐）
+a = {1, 2, 3, 4}
+b = {2, 4}
+result = a - b
+print(result)  # {1, 3}
+print(a)       # {1, 2, 3, 4}（原 set 没变）
+```
+#### `dict.setdefault(key, default)`
+这个是defaultdict用不了的选择
+功能：  
+如果字典中存在 `key`，返回该 `key` 对应的 `value`。  
+如果字典中不存在 `key`，则将 `key` 添加到字典，并将其 `value` 设置为 `default`，然后返回 `default`。
+```python
+d = {}
+d.setdefault('x', []).append(10)
+print(d)  # {'x': [10]}
+```
+#### `reversed(seq)`  
+参数 seq：必须是序列类型 比如 list、tuple、str、range 等。  
+返回值：一个 反向迭代器（不是 list，而是 reversed 对象）。  
+```python
+nums = [1, 2, 3, 4]
+rev = reversed(nums)
+print(rev)               # <list_reverseiterator object>
+print(list(rev))         # [4, 3, 2, 1]
+```
+#### find()用法(只能用于string）
+```python
+s = "hello world"
+print(s.find("world"))   # 6
+print(s.find("o"))       # 4（第一个 o 在索引 4）
+print(s.find("python"))  # -1（找不到）
+print(s.find("o", 5))    # 7，从索引 5 开始找，找到第二个 o
+print(s.find("o", 8))    # -1，8 之后没有 o
+print(s.find("o", 0, 5))   # 4，只在 [0,5) 范围找
+print(s.find("o", 5, 8))   # 7，只在 [5,8) 范围找
+```
+#### `s.replace(old, new, count)`
+old：要被替换掉的子串
+new：新的子串
+count（可选）：替换的最大次数，省略时表示替换全部
+```python
+s = "hello world world"
+# 替换所有 "world" 为 "python"
+print(s.replace("world", "python"))
+# 输出: hello python python
+# 只替换前 1 个
+print(s.replace("world", "python", 1))
+# 输出: hello python world
+# 原字符串不变
+print(s)
+# 输出: hello world world
+```
+#### ord和chr
+ord("A") = 65
+ord("Z") = 90
+ord("a") = 97
+ord("z") = 122
+chr(65) = "A"
+#### 函数形参
+- 函数的形参引入的是不可变对象（如整数、字符串、元组），这些对象在函数内部修改时会创建新对象，必须通过参数传递才能跨调用保持更新。  
+可变对象 (列表、字典等) 可以直接修改，通常不需要作为参数传递：
+```python
+def factorial(n: int) -> int:
+    if n == 0:
+        return 1
+    return n * factorial(n - 1)  # 必须传递n-1
+```
+- 当不同递归层级需要独立的状态副本时，必须通过参数传递：
+```python
+def backtrack(i,path):
+   mylist.append(path.copy())
+```
+#### 常见 is 开头的方法及作用  
+
+| 方法名         | 功能描述                | 示例                        | 结果     |
+| ----------- | ------------------- | ------------------------- | ------ |
+| `isupper()` | 判断字符串是否全部为大写字母      | `"ABC".isupper()`         | `True` |
+| `islower()` | 判断字符串是否全部为小写字母      | `"abc".islower()`         | `True` |
+| `isdigit()` | 判断字符串是否全部由数字组成      | `"123".isdigit()`         | `True` |
+| `isalpha()` | 判断字符串是否全部由字母组成      | `"abc".isalpha()`         | `True` |
+| `isalnum()` | 判断字符串是否由字母和数字组成     | `"abc123".isalnum()`      | `True` |
+| `isspace()` | 判断字符串是否全部由空白字符组成    | `"   \t\n".isspace()`     | `True` |
+| `istitle()` | 判断字符串是否为标题格式（首字母大写） | `"Hello World".istitle()` | `True` |
+```
+" ".islower() 的结果是 False
+```
+```python
+print("123 !".upper())        # 输出: 123 !
+print(" ".upper())            # 输出:  （还是空格）
+```
+`upper()` 只转换字母，不改变数字、空格和符号。
+#### math
+使用前要先导入：
+```python
+import math
+```
+里面主要有：数学常量、基础函数、三角函数、指数对数函数、取整函数、特殊函数等。
+```
+math.pi        # 圆周率 π = 3.14159...
+math.e         # 自然常数 e = 2.71828...
+```
+```
+math.pow(x, y)     # 幂运算 x^y
+math.factorial(n)  # 阶乘 n!
+math.gcd(a, b)     # 最大公约数
+```
+```
+math.ceil(x)    # 向上取整
+```
+```
+math.exp(x)       # e^x
+math.log(x)       # ln(x)，自然对数
+math.log10(x)     # 以 10 为底的对数
+math.log2(x)      # 以 2 为底的对数
+```
+```
+math.sin(x)    # 正弦，x 是弧度
+math.cos(x)    # 余弦
+math.tan(x)    # 正切
+math.asin(x)   # 反正弦（返回弧度）
+math.acos(x)   # 反余弦
+math.atan(x)   # 反正切
+math.atan2(y, x) # 用坐标(y,x)求角度
+```
+角度与弧度转换：
+```
+math.radians(deg)  # 角度 → 弧度
+math.degrees(rad)  # 弧度 → 角度
+```
+```
+math.sinh(x)   # 双曲正弦
+math.cosh(x)   # 双曲余弦
+math.tanh(x)   # 双曲正切
+```
+```
+math.comb(n, k)   # 组合数 C(n,k)
+math.perm(n, k)   # 排列数 P(n,k)
+```
+#### `from itertools import permutations`
+生成所有排列
+```python
+text = "ABC"
+result = list(permutations(text))
+print(result)
+# 输出: [('A', 'B', 'C'), ('A', 'C', 'B'), ('B', 'A', 'C'), 
+#        ('B', 'C', 'A'), ('C', 'A', 'B'), ('C', 'B', 'A')]
+```
+#### `end`
+```python
+print("Hello", end="")
+print("World")
+# HelloWorld
+```
+#### 正则（Regular Expression）
+| 符号    | 含义              | 示例                            | 
+| ----- | --------------- | ----------------------------- | 
+| `.`   | 匹配任意一个字符（除了换行）  | `a.c` → `"abc"`, `"axc"`      |   
+| `^`   | 匹配字符串开头         | `^abc` → `"abc123"`           |     
+| `$`   | 匹配字符串结尾         | `abc$` → `"123abc"`           |     
+| `[]`  | 字符集，匹配其中任意一个    | `[abc]` → `"a" or "b" or "c"` |    
+| `[^]` | 否定字符集，匹配不在里面的字符 | `[^0-9]` → 非数字                |    
+| `\|`  | 或                  | `abc\|xyz` → `"abc"`或`"xyz"` |
+| `\`   | 转义特殊字符          | `\.` 匹配点 `"."`                |    
+
+| 符号      | 含义          | 示例                                   |
+| ------- | ----------- | ------------------------------------ |
+| `*`     | 匹配 0 次或多次   | `a*` → `""`, `"a"`, `"aaa"`          |
+| `+`     | 匹配 1 次或多次   | `a+` → `"a"`, `"aaa"`                |
+| `?`     | 匹配 0 次或 1 次 | `a?` → `""` 或 `"a"`                  |
+| `{n}`   | 精确匹配 n 次    | `a{3}` → `"aaa"`                     |
+| `{n,}`  | 匹配 n 次或以上   | `a{2,}` → `"aa"`, `"aaa"`, ...       |
+| `{n,m}` | 匹配 n 到 m 次  | `a{2,4}` → `"aa"`, `"aaa"`, `"aaaa"` |
+
+| 符号   | 含义                 | 示例                |
+| ---- | ------------------ | ----------------- |
+| `\d` | 数字 [0-9]           | `\d{3}` → `"123"` |
+| `\D` | 非数字                | `\D+`             |
+| `\w` | 单词字符 [a-zA-Z0-9_]  | `\w+`             |
+| `\W` | 非单词字符              | `\W+`             |
+| `\s` | 空白字符 (空格, 制表符, 换行) | `\s+`             |
+| `\S` | 非空白字符              | `\S+`             |
+
+`( )`：分组   
+`(?: )`：非捕获分组（不保存匹配结果）    
+例子： 
+```
+import re
+s = "ababab"  
+re.findall(r"ab+",s)     # ['ab','ab','ab']
+re.findall(r"(?:ab)+",s) # ['ababab']
+re.findall(r"(ab)+",s)   # ['ab']
+由于 (ab) 是一个捕获组，且后面跟着 +（匹配一次或多次），这个捕获组会不断被更新。
+它先捕获第一个 "ab"，然后是第二个 "ab"，最后是第三个 "ab"。
+最后一次捕获的内容会覆盖掉之前的内容。因此，最终返回的是最后一次捕获的 "ab"。
+```
+```
+(\d{4})-(\d{2})-(\d{2})
+```
+匹配 "2025-10-04"    
+分组 1 = "2025"，分组 2 = "10"，分组 3 = "04"
+```
+import re
+# 匹配
+re.match(r"\d+", "123abc")    # 从开头匹配
+re.search(r"\d+", "abc123")   # 搜索第一个匹配
+re.findall(r"\d+", "a1b22c3") # ['1','22','3']
+# 替换
+re.sub(r"\d+", "X", "a1b22c3") # aXbXcX
+# 分割
+re.split(r"\s+", "a b   c")    # ['a','b','c']
+```
+匹配形如 2025-10-04 的日期，并分别捕获年、月、日。
+```python
+import re
+text = "2025-10-04"
+pattern = r"(\d{4})-(\d{2})-(\d{2})" # 数字要加{}
+result = re.findall(pattern, text) # findall函数有两个形参
+print(result) # [('2025', '10', '04')]
+```
+匹配常见邮箱地址，如：alice@example.com  bob_123@pku.edu.cn     
+要求分组出 用户名 和 域名
+```python
+import re
+text = "alice@example.com bob.world-123@pku.edu.cn"
+pattern = r"([\w.-]+)@([\w.-]+\.[a-zA-Z]{2,6})" # \w匹配字母数字和下划线   \.是专门匹配.(否则.是替代除换行的任意一个字符）
+result = re.findall(pattern, text)
+print(result) # [('alice', 'example.com'), ('bob.world-123', 'pku.edu.cn')]
+```       
+####  `bin(x)`
+把整数 x 转换为二进制字符串。
+格式固定为：
+'0bxxxxx'
+其中 0b 是前缀，表示“二进制”。
